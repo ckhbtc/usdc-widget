@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USDC → Injective</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="noise"></div>
+
+  <main class="card">
+    <header class="card-header">
+      <h1>USDC <span class="arrow">→</span> Injective</h1>
+      <button id="connect-btn" class="btn btn-secondary">Connect</button>
+    </header>
+
+    <section class="form">
+      <label class="field">
+        <span class="label">From</span>
+        <select id="source-select" class="input"></select>
+      </label>
+
+      <label class="field">
+        <span class="label">
+          Amount
+          <span class="balance-hint" id="balance"></span>
+        </span>
+        <div class="input-group">
+          <input id="amount" class="input" type="number" inputmode="decimal" min="0" step="0.000001" placeholder="0.00">
+          <button id="max-btn" class="btn btn-ghost" type="button">Max</button>
+          <span class="suffix">USDC</span>
+        </div>
+      </label>
+
+      <label class="field">
+        <span class="label">Recipient on Injective EVM</span>
+        <input id="recipient" class="input" type="text" placeholder="0x...">
+      </label>
+
+      <button id="bridge-btn" class="btn btn-primary" disabled>Bridge to Injective</button>
+    </section>
+
+    <section class="timeline" id="timeline" hidden>
+      <ol id="steps"></ol>
+    </section>
+
+    <footer class="card-footer">
+      <small>
+        Direct CCTP V2 burn-and-mint. No relayer, no aggregator.
+        Domain <code>29</code> · USDC <code>0xa00C…35a</code>.
+      </small>
+    </footer>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
