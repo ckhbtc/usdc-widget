@@ -1,0 +1,15 @@
+{
+  "name": "usdc-widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny self-hosted CCTP widget for bridging native USDC into Injective EVM (domain 29).",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "hono": "^4.6.0"
+  }
+}
