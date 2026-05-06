@@ -174,6 +174,7 @@ function txLink(explorer, hash) {
 
 async function bridge() {
   elBridge.disabled = true;
+  elBridge.textContent = 'Bridge to Injective';
   const state = {};
   let skipApprove = false;
   let lastKey = null;
@@ -267,6 +268,7 @@ async function bridge() {
     await injClient.waitForTransactionReceipt({ hash: mintHash });
     setStep('mint', 'done', `minted to ${shortAddr(recipient)} · ${txLink(INJECTIVE.explorer, mintHash)}`);
 
+    elBridge.textContent = 'Bridge another →';
     refreshBalance();
   } catch (err) {
     console.error(err);
