@@ -26,7 +26,7 @@
           <div class="brand-text">
             <div class="brand-name">
               <span id="dir-from">USDC</span>
-              <button class="dir-toggle" id="dir-toggle" type="button" aria-label="Swap direction" title="Swap direction">→</button>
+              <span class="dir-arrow" aria-hidden="true">→</span>
               <span id="dir-to">INJECTIVE</span>
             </div>
             <div class="brand-sub">CCTP V2 · DOMAIN 29</div>
@@ -37,6 +37,19 @@
           <span class="addr" id="connect-addr">Connect</span>
         </button>
       </header>
+
+      <nav class="direction-tabs" aria-label="Transfer direction">
+        <button class="direction-tab active" id="tab-in" type="button" aria-pressed="true">
+          <span class="direction-tab-icon" aria-hidden="true">↓</span>
+          <span>DEPOSIT</span>
+          <span class="direction-tab-sub">to Injective</span>
+        </button>
+        <button class="direction-tab" id="tab-out" type="button" aria-pressed="false">
+          <span class="direction-tab-icon" aria-hidden="true">↑</span>
+          <span>WITHDRAW</span>
+          <span class="direction-tab-sub">from Injective</span>
+        </button>
+      </nav>
 
       <div class="split">
         <section class="form">

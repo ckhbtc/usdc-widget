@@ -165,10 +165,11 @@ const els = {
   connectDot: $('connect-dot'),
   connectAddr: $('connect-addr'),
 
-  // Direction toggle (in header)
+  // Direction toggle (segmented tabs above the split + labels in the brand)
   dirFrom: $('dir-from'),
   dirTo: $('dir-to'),
-  dirToggle: $('dir-toggle'),
+  tabIn: $('tab-in'),
+  tabOut: $('tab-out'),
 
   // Form labels (toggle copy on direction)
   fromLabel: $('from-label'),
@@ -498,6 +499,12 @@ function renderRouteUI() {
   // Header swap label
   els.dirFrom.textContent = direction === 'in' ? 'USDC' : 'INJECTIVE';
   els.dirTo.textContent   = direction === 'in' ? 'INJECTIVE' : 'USDC';
+
+  // Tab active state
+  els.tabIn.classList.toggle('active', direction === 'in');
+  els.tabIn.setAttribute('aria-pressed', direction === 'in');
+  els.tabOut.classList.toggle('active', direction === 'out');
+  els.tabOut.setAttribute('aria-pressed', direction === 'out');
 
   // Form labels — the chain dropdown represents the non-Injective side of the
   // route. In inbound mode that's the FROM; in outbound mode it's the TO.
@@ -1180,11 +1187,14 @@ if (window.ethereum) {
     .catch(() => {});
 }
 
-// Direction toggle
-els.dirToggle.addEventListener('click', (e) => {
-  e.stopPropagation();
+// Direction tabs — clicking the inactive tab swaps direction; clicking the
+// already-active tab is a no-op (no double-flip).
+function setDirection(next) {
+  if (direction === next) return;
   swapDirection();
-});
+}
+els.tabIn.addEventListener('click',  () => setDirection('in'));
+els.tabOut.addEventListener('click', () => setDirection('out'));
 
 // Initial render
 buildChainMenu();
