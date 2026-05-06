@@ -293,7 +293,7 @@ function renderSourceUI() {
   els.srcMarkInline.textContent = d.letter;
   els.srcNameInline.textContent = c.name;
   // Stage source node monogram + name
-  els.srcMark.className = `chain-mark lg ${d.mark}`;
+  els.srcMark.className = `chain-mark xl ${d.mark}`;
   els.srcMark.textContent = d.letter;
   els.srcName.textContent = c.name;
 }
