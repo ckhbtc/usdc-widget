@@ -31,12 +31,13 @@ import {
 // Per-chain visual info for the redesigned UI. Keyed by chain id; mirrors the
 // chain-mark CSS classes in styles.css. `chains.js` stays untouched (locked).
 const CHAIN_DISPLAY = {
-  1:     { mark: 'eth',  letter: 'Ξ',  icon: '/eth.png' },
-  42161: { mark: 'arb',  letter: 'A',  icon: '/arb.png' },
-  8453:  { mark: 'base', letter: 'B',  icon: '/base.png' },
-  10:    { mark: 'op',   letter: 'OP', icon: '/op.png' },
+  1:     { mark: 'eth',  letter: 'Ξ',   icon: '/eth.png' },
+  42161: { mark: 'arb',  letter: 'A',   icon: '/arb.png' },
+  8453:  { mark: 'base', letter: 'B',   icon: '/base.png' },
+  10:    { mark: 'op',   letter: 'OP',  icon: '/op.png' },
   137:   { mark: 'poly', letter: 'P' },   // monogram fallback — no icon yet
   43114: { mark: 'avax', letter: 'A' },   // monogram fallback — no icon yet
+  1776:  { mark: 'inj',  letter: 'INJ', icon: '/inj.png' },  // Injective (used in outbound mode)
 };
 
 // Paint a chain-mark element in place. If the chain has an icon, render an
@@ -163,6 +164,15 @@ const els = {
   connectDot: $('connect-dot'),
   connectAddr: $('connect-addr'),
 
+  // Direction toggle (in header)
+  dirFrom: $('dir-from'),
+  dirTo: $('dir-to'),
+  dirToggle: $('dir-toggle'),
+
+  // Form labels (toggle copy on direction)
+  fromLabel: $('from-label'),
+  recipientLabel: $('recipient-label'),
+
   chainSelect: $('chain-select'),
   chainMenu: $('chain-menu'),
   srcMarkInline: $('src-mark-inline'),
@@ -184,17 +194,19 @@ const els = {
 
   nodeSource: $('node-source'),
   nodeCircle: $('node-circle'),
-  nodeInj: $('node-inj'),
+  nodeDst: $('node-dst'),
 
   srcMark: $('src-mark'),
   srcName: $('src-name'),
   srcPip: $('src-pip'),
   circlePip: $('circle-pip'),
-  injPip: $('inj-pip'),
+  dstMark: $('dst-mark'),
+  dstName: $('dst-name'),
+  dstPip: $('dst-pip'),
 
   srcStatus: $('src-status'),
   circleStatus: $('circle-status'),
-  injStatus: $('inj-status'),
+  dstStatus: $('dst-status'),
 
   seg1: $('seg1'),
   seg1Fill: $('seg1').querySelector('.fill'),
@@ -218,6 +230,9 @@ let account = null;
 let walletClient = null;
 let selectedChainId = SOURCE_CHAINS[0].id;
 let recipient = '';
+// Direction: 'in' = USDC (selected chain) → Injective. 'out' = Injective → USDC (selected chain).
+// The chain dropdown always represents the *non-Injective* side of the route.
+let direction = 'in';
 
 // Live run state — drives renderPhase().
 const run = {
@@ -256,9 +271,17 @@ function fmtAmount(s) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
-function getSource() {
+function getOtherChain() {
   return SOURCE_CHAINS.find((c) => c.id === selectedChainId) || SOURCE_CHAINS[0];
 }
+function getSrcChain() {
+  return direction === 'in' ? getOtherChain() : INJECTIVE;
+}
+function getDstChain() {
+  return direction === 'in' ? INJECTIVE : getOtherChain();
+}
+// Back-compat alias for the legacy callsites that still say `getSource()`.
+const getSource = getSrcChain;
 
 function publicClient(c) {
   return createPublicClient({
@@ -310,15 +333,37 @@ function renderConnectChip() {
   }
 }
 
-function renderSourceUI() {
-  const c = getSource();
-  // Inline pill in the form (base size)
-  paintChainMark(els.srcMarkInline, c.id);
-  els.srcNameInline.textContent = c.name;
-  // Stage source node (xl size)
-  paintChainMark(els.srcMark, c.id, 'xl');
-  els.srcName.textContent = c.name;
+function renderRouteUI() {
+  const other = getOtherChain();
+  const src = getSrcChain();
+  const dst = getDstChain();
+
+  // Header swap label
+  els.dirFrom.textContent = direction === 'in' ? 'USDC' : 'INJECTIVE';
+  els.dirTo.textContent   = direction === 'in' ? 'INJECTIVE' : 'USDC';
+
+  // Form labels — the chain dropdown represents the non-Injective side of the
+  // route. In inbound mode that's the FROM; in outbound mode it's the TO.
+  els.fromLabel.textContent = direction === 'in' ? '§ FROM' : '§ TO';
+  els.recipientLabel.textContent =
+    direction === 'in'
+      ? '§ RECIPIENT · INJ EVM'
+      : `§ RECIPIENT · ${other.name.toUpperCase()}`;
+
+  // Form-side chain pill — always the non-Injective chain at base size
+  paintChainMark(els.srcMarkInline, other.id);
+  els.srcNameInline.textContent = other.name;
+
+  // Stage source node (top of the track) — direction-dependent
+  paintChainMark(els.srcMark, src.id, 'xl');
+  els.srcName.textContent = src.name;
+
+  // Stage destination node (bottom of the track) — direction-dependent
+  paintChainMark(els.dstMark, dst.id, 'xl');
+  els.dstName.textContent = dst.name;
 }
+// Legacy alias for callsites that still say renderSourceUI()
+const renderSourceUI = renderRouteUI;
 
 function renderRecipientDisplay() {
   els.recipientAddr.textContent = recipient || '—';
@@ -346,8 +391,20 @@ function closeChainMenu() { els.chainMenu.hidden = true; }
 function selectChain(id) {
   selectedChainId = id;
   closeChainMenu();
-  renderSourceUI();
+  renderRouteUI();
   buildChainMenu();
+  refreshBalance();
+  // The destination node and the bridge button label both depend on the
+  // selected chain, so re-render the phase to pick up the new dst.name.
+  renderPhase();
+}
+
+function swapDirection() {
+  direction = direction === 'in' ? 'out' : 'in';
+  // Abandon any in-progress run visualization — stale phase classes would
+  // describe the wrong route after the swap.
+  resetRun();
+  renderRouteUI();
   refreshBalance();
 }
 
@@ -357,7 +414,7 @@ async function refreshBalance() {
     delete els.balanceNum.dataset.raw;
     return;
   }
-  const src = getSource();
+  const src = getSrcChain();
   els.balanceNum.textContent = '…';
   try {
     const bal = await publicClient(src).readContract({
@@ -444,7 +501,8 @@ function txLink(explorer, hash, label) {
 }
 
 function renderNodeStatuses(phase) {
-  const src = getSource();
+  const src = getSrcChain();
+  const dst = getDstChain();
   // Source
   let srcHtml;
   if (phase === 'idle') {
@@ -480,27 +538,30 @@ function renderNodeStatuses(phase) {
   }
   els.circleStatus.innerHTML = circleHtml;
 
-  // Injective
-  let injHtml;
+  // Destination
+  let dstHtml;
   if (phase === 'mint-sign' || phase === 'mint-confirm') {
-    injHtml = run.mintHash
+    dstHtml = run.mintHash
       ? `<span class="status-line"><span class="tag-cyan">CONFIRMING…</span></span>`
       : `<span class="status-line"><span class="tag-cyan">MINTING…</span></span>`;
   } else if (phase === 'success') {
-    injHtml = run.mintHash
-      ? `<span class="status-line"><span class="tag-green">MINTED</span> ${txLink(INJECTIVE.explorer, run.mintHash)}</span>`
+    dstHtml = run.mintHash
+      ? `<span class="status-line"><span class="tag-green">MINTED</span> ${txLink(dst.explorer, run.mintHash)}</span>`
       : `<span class="status-line"><span class="tag-green">MINTED</span></span>`;
   } else if (phase === 'failed') {
-    injHtml = `<span class="status-line"><span class="tag-red">FAILED</span></span>`;
+    dstHtml = `<span class="status-line"><span class="tag-red">FAILED</span></span>`;
   } else {
-    injHtml = `<span class="status-line"><span class="tag-dim">DOMAIN 29</span></span>`;
+    dstHtml = `<span class="status-line"><span class="tag-dim">DOMAIN ${dst.domain}</span></span>`;
   }
-  els.injStatus.innerHTML = injHtml;
+  els.dstStatus.innerHTML = dstHtml;
 }
 
 function renderDetailStrip(phase) {
-  const src = getSource();
+  const src = getSrcChain();
+  const dst = getDstChain();
   const srcName = src.name;
+  const dstName = dst.name;
+  const dstUpper = dstName.toUpperCase();
 
   let detail = null;
   if (phase === 'approve-sign') {
@@ -517,16 +578,16 @@ function renderDetailStrip(phase) {
     detail = { tone: 'amber', strong: 'CIRCLE ATTESTATION', text: 'Polling iris-api.circle.com',
                elapsed: formatElapsed(run.elapsedMs) };
   } else if (phase === 'switch') {
-    detail = { tone: 'cyan', strong: 'SWITCH NETWORK', text: 'Switching wallet to Injective EVM (chain 1776)' };
+    detail = { tone: 'cyan', strong: 'SWITCH NETWORK', text: `Switching wallet to ${dstName} (chain ${dst.id})` };
   } else if (phase === 'mint-sign') {
-    detail = { tone: 'cyan', strong: 'MINT ON INJECTIVE', text: 'Awaiting wallet signature — receiveMessage' };
+    detail = { tone: 'cyan', strong: `MINT ON ${dstUpper}`, text: 'Awaiting wallet signature — receiveMessage' };
   } else if (phase === 'mint-confirm') {
-    detail = { tone: 'cyan', strong: 'MINT ON INJECTIVE', text: 'Confirming mint on Injective EVM',
-               hash: run.mintHash, explorer: INJECTIVE.explorer };
+    detail = { tone: 'cyan', strong: `MINT ON ${dstUpper}`, text: `Confirming mint on ${dstName}`,
+               hash: run.mintHash, explorer: dst.explorer };
   } else if (phase === 'success') {
     detail = { tone: 'green', strong: `${fmtAmount(run.amount)} USDC ARRIVED`,
-               text: 'Mint confirmed on Injective EVM',
-               hash: run.mintHash, explorer: INJECTIVE.explorer };
+               text: `Mint confirmed on ${dstName}`,
+               hash: run.mintHash, explorer: dst.explorer };
   } else if (phase === 'failed') {
     detail = { tone: 'red', strong: 'BRIDGE FAILED',
                text: run.error ? run.error : 'Run halted — funds remain safe' };
@@ -562,7 +623,7 @@ function renderPhase() {
   // Nodes
   applyNodeTone(els.nodeSource, els.srcPip, p.source);
   applyNodeTone(els.nodeCircle, els.circlePip, p.circle);
-  applyNodeTone(els.nodeInj,   els.injPip,    p.inj);
+  applyNodeTone(els.nodeDst,    els.dstPip,    p.inj);
 
   // Segments
   applySegment(els.seg1, els.seg1Fill, p.seg1, p.seg1Fill);
@@ -582,7 +643,13 @@ function renderPhase() {
     els.bridgeBtn.disabled = false;
   } else {
     els.bridgeBtn.className = 'btn-primary' + (p.btn.cls ? ' ' + p.btn.cls : '');
-    els.bridgeBtn.textContent = p.btn.label;
+    // Override the idle label so it names the actual destination chain
+    // (e.g. "BRIDGE TO ETHEREUM" in outbound mode).
+    if (run.phase === 'idle') {
+      els.bridgeBtn.textContent = `BRIDGE TO ${getDstChain().name.toUpperCase()}`;
+    } else {
+      els.bridgeBtn.textContent = p.btn.label;
+    }
     els.bridgeBtn.disabled = p.btn.disabled;
   }
 
@@ -658,7 +725,8 @@ async function bridge() {
   run.elapsedMs = 0;
   run.error = null;
 
-  const src = getSource();
+  const src = getSrcChain();
+  const dst = getDstChain();
 
   // Validate amount
   let amount;
@@ -679,7 +747,7 @@ async function bridge() {
   run.amount = els.amount.value;
 
   const sourceClient = publicClient(src);
-  const injClient = publicClient(INJECTIVE);
+  const destClient = publicClient(dst);
 
   try {
     await ensureChain(src);
@@ -706,7 +774,8 @@ async function bridge() {
       await sourceClient.waitForTransactionReceipt({ hash: approveHash });
     }
 
-    // Burn
+    // Burn on the source chain — destinationDomain is the dst chain's
+    // CCTP domain (29 for Injective, 0/2/3/6/7/1 for the EVM L1/L2 chains).
     setPhase('burn-sign');
     const burnHash = await walletClient.writeContract({
       address: src.cctp.tokenMessenger,
@@ -714,7 +783,7 @@ async function bridge() {
       functionName: 'depositForBurn',
       args: [
         amount,
-        INJECTIVE.domain,
+        dst.domain,
         mintRecipient,
         src.usdc,
         ZERO_BYTES32,
@@ -742,22 +811,22 @@ async function bridge() {
     const { message, attestation } = await pollAttestation(src.domain, burnHash);
     if (pollTickId) { clearInterval(pollTickId); pollTickId = null; }
 
-    // Switch
+    // Switch wallet to the destination chain for the mint
     setPhase('switch');
-    await ensureChain(INJECTIVE);
+    await ensureChain(dst);
 
     // Mint
     setPhase('mint-sign');
     const mintHash = await walletClient.writeContract({
-      address: INJECTIVE.cctp.messageTransmitter,
+      address: dst.cctp.messageTransmitter,
       abi: MESSAGE_TRANSMITTER_V2_ABI,
       functionName: 'receiveMessage',
       args: [message, attestation],
-      chain: viemChain(INJECTIVE),
+      chain: viemChain(dst),
     });
     run.mintHash = mintHash;
     setPhase('mint-confirm');
-    await injClient.waitForTransactionReceipt({ hash: mintHash });
+    await destClient.waitForTransactionReceipt({ hash: mintHash });
 
     setPhase('success');
     refreshBalance();
@@ -871,9 +940,15 @@ if (window.ethereum) {
     .catch(() => {});
 }
 
+// Direction toggle
+els.dirToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  swapDirection();
+});
+
 // Initial render
 buildChainMenu();
-renderSourceUI();
+renderRouteUI();
 renderRecipientDisplay();
 renderConnectChip();
 renderPhase();

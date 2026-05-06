@@ -20,7 +20,11 @@
             </svg>
           </div>
           <div class="brand-text">
-            <div class="brand-name">USDC → INJECTIVE</div>
+            <div class="brand-name">
+              <span id="dir-from">USDC</span>
+              <button class="dir-toggle" id="dir-toggle" type="button" aria-label="Swap direction" title="Swap direction">→</button>
+              <span id="dir-to">INJECTIVE</span>
+            </div>
             <div class="brand-sub">CCTP V2 · DOMAIN 29</div>
           </div>
         </div>
@@ -33,7 +37,7 @@
       <div class="split">
         <section class="form">
           <div class="field">
-            <label class="field-label">§ FROM</label>
+            <label class="field-label" id="from-label">§ FROM</label>
             <div class="chain-select" id="chain-select" style="position: relative;">
               <div class="chain-mark eth" id="src-mark-inline">Ξ</div>
               <span class="chain-name" id="src-name-inline">Ethereum</span>
@@ -57,7 +61,7 @@
           </div>
 
           <div class="field">
-            <label class="field-label">§ RECIPIENT · INJ EVM</label>
+            <label class="field-label" id="recipient-label">§ RECIPIENT · INJ EVM</label>
             <div class="recipient" id="recipient-row">
               <div class="recipient-avatar" aria-hidden="true"></div>
               <span class="recipient-addr" id="recipient-addr">—</span>
@@ -123,17 +127,17 @@
               <div class="disc" id="disc2" hidden>$</div>
             </div>
 
-            <div class="node dim" id="node-inj">
+            <div class="node dim" id="node-dst">
               <div class="node-avatar">
                 <div class="ring" aria-hidden="true"></div>
-                <div class="chain-mark xl inj has-icon"><img src="/inj.png" alt="" loading="lazy"></div>
-                <div class="pip" id="inj-pip" hidden></div>
+                <div class="chain-mark xl inj has-icon" id="dst-mark"><img src="/inj.png" alt="" loading="lazy"></div>
+                <div class="pip" id="dst-pip" hidden></div>
               </div>
               <div class="node-info">
                 <div class="node-label">DESTINATION</div>
-                <div class="node-name">Injective EVM</div>
+                <div class="node-name" id="dst-name">Injective EVM</div>
               </div>
-              <div class="node-status" id="inj-status">
+              <div class="node-status" id="dst-status">
                 <span class="status-line"><span class="tag-dim">DOMAIN 29</span></span>
               </div>
             </div>
