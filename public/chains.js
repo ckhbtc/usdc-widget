@@ -8,7 +8,9 @@ export const CCTP_V2 = {
 
 export const ATTESTATION_API = 'https://iris-api.circle.com';
 
-// Standard transfer parameters (Injective does not support fast transfer).
+// CCTP V2 transfer parameters. Standard waits for finalized attestation;
+// Fast uses confirmed attestation and requires a route fee allowance.
+export const FAST_FINALITY = 1000;
 export const STANDARD_FINALITY = 2000;
 export const STANDARD_MAX_FEE = 0n;
 export const ZERO_BYTES32 =

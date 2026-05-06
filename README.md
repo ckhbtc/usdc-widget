@@ -12,6 +12,9 @@ custodian. Walks the user through:
 
 Supports Ethereum, Arbitrum, Base, OP Mainnet, Polygon, and Avalanche as
 source chains. All use the same V2 contracts (deterministic addresses).
+Users can choose Standard CCTP or Fast CCTP. Fast mode fetches Circle's
+current route fee before burning and passes the buffered `maxFee` plus the
+confirmed finality threshold into `depositForBurn`.
 
 ## Why this exists
 
@@ -68,11 +71,17 @@ Append to `SOURCE_CHAINS` in `public/chains.js`:
 Source for current Circle domain IDs and addresses:
 [developers.circle.com/cctp/cctp-supported-blockchains](https://developers.circle.com/cctp/cctp-supported-blockchains).
 
+## Transfer speed
+
+- **Standard.** Uses finalized attestation (`minFinalityThreshold = 2000`)
+  and `maxFee = 0`.
+- **Fast.** Uses confirmed attestation (`minFinalityThreshold = 1000`).
+  The widget calls Circle's `/v2/burn/USDC/fees/<src>/<dst>` endpoint before
+  the burn, adds a 20% buffer to the returned fee, and checks the global Fast
+  Transfer allowance.
+
 ## Limitations
 
-- **Standard transfer only.** Injective doesn't support CCTP fast
-  transfer — Ethereum → Injective will take ~13 minutes for finality.
-  L2s are ~1 minute.
 - **One transfer at a time.** No queueing or recovery — if your tab
   closes after the burn but before the mint, see "Recover a stuck
   transfer" below.

@@ -61,6 +61,23 @@
           </div>
 
           <div class="field">
+            <label class="field-label">§ SPEED</label>
+            <div class="speed-panel">
+              <div class="speed-toggle" role="group" aria-label="CCTP transfer speed">
+                <button class="speed-option active" id="speed-standard" type="button" aria-pressed="true">
+                  <span>STANDARD</span>
+                  <small>FREE</small>
+                </button>
+                <button class="speed-option" id="speed-fast" type="button" aria-pressed="false">
+                  <span>FAST</span>
+                  <small id="speed-fast-fee">QUOTE</small>
+                </button>
+              </div>
+              <div class="speed-meta" id="speed-meta">STANDARD · FINALIZED</div>
+            </div>
+          </div>
+
+          <div class="field">
             <label class="field-label" id="recipient-label">§ RECIPIENT · INJ EVM</label>
             <div class="recipient" id="recipient-row">
               <div class="recipient-avatar" aria-hidden="true"></div>

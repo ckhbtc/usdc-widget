@@ -15,6 +15,7 @@ import {
   SOURCE_CHAINS,
   INJECTIVE,
   ATTESTATION_API,
+  FAST_FINALITY,
   STANDARD_FINALITY,
   STANDARD_MAX_FEE,
   ZERO_BYTES32,
@@ -182,6 +183,11 @@ const els = {
   maxBtn: $('max-btn'),
   balanceNum: $('balance-num'),
 
+  speedStandard: $('speed-standard'),
+  speedFast: $('speed-fast'),
+  speedFastFee: $('speed-fast-fee'),
+  speedMeta: $('speed-meta'),
+
   recipientRow: $('recipient-row'),
   recipientAddr: $('recipient-addr'),
   recipientInput: $('recipient-input'),
@@ -233,11 +239,13 @@ let recipient = '';
 // Direction: 'in' = USDC (selected chain) → Injective. 'out' = Injective → USDC (selected chain).
 // The chain dropdown always represents the *non-Injective* side of the route.
 let direction = 'in';
+let transferMode = 'standard';
 
 // Live run state — drives renderPhase().
 const run = {
   phase: 'idle',
   amount: '',
+  transferMode: 'standard',
   approveHash: null,
   burnHash: null,
   mintHash: null,
@@ -246,6 +254,15 @@ const run = {
 };
 
 let pollTickId = null;
+let bridgeInFlight = false;
+let feeQuoteRequestId = 0;
+const feeQuoteCache = new Map();
+const feeQuoteState = {
+  routeKey: '',
+  loading: false,
+  error: null,
+  entries: null,
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -271,6 +288,49 @@ function fmtAmount(s) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 
+function fmtUsdcSubunits(units, maxFractionDigits = 6) {
+  const n = Number(formatUnits(units, 6));
+  if (!isFinite(n)) return formatUnits(units, 6);
+  return n.toLocaleString(undefined, {
+    minimumFractionDigits: units === 0n ? 0 : 2,
+    maximumFractionDigits,
+  });
+}
+
+function fmtBps(bps) {
+  const n = Number(bps);
+  if (!isFinite(n)) return '—';
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+function divCeil(n, d) {
+  return n === 0n ? 0n : ((n - 1n) / d) + 1n;
+}
+
+function feeBpsToMaxFee(amount, bps) {
+  const n = Number(bps);
+  if (!isFinite(n) || n <= 0) return 0n;
+  const scaledBps = BigInt(Math.ceil(n * 100));
+  const protocolFee = divCeil(amount * scaledBps, 1_000_000n);
+  return divCeil(protocolFee * 120n, 100n);
+}
+
+function decimalUsdcToSubunits(value) {
+  const raw = String(value ?? '0').trim();
+  const [wholeRaw = '0', fracRaw = ''] = raw.split('.');
+  const whole = wholeRaw.replace(/[^\d]/g, '') || '0';
+  const frac = (fracRaw.replace(/[^\d]/g, '') + '000000').slice(0, 6);
+  return (BigInt(whole) * 1_000_000n) + BigInt(frac);
+}
+
+function readAmountInput() {
+  try {
+    return parseUnits(els.amount.value || '0', 6);
+  } catch {
+    return null;
+  }
+}
+
 function getOtherChain() {
   return SOURCE_CHAINS.find((c) => c.id === selectedChainId) || SOURCE_CHAINS[0];
 }
@@ -283,11 +343,108 @@ function getDstChain() {
 // Back-compat alias for the legacy callsites that still say `getSource()`.
 const getSource = getSrcChain;
 
+function getRouteKey(src = getSrcChain(), dst = getDstChain()) {
+  return `${src.domain}:${dst.domain}`;
+}
+
 function publicClient(c) {
   return createPublicClient({
     chain: viemChain(c),
     transport: fallback(c.rpcs.map((url) => http(url, { timeout: 8000 }))),
   });
+}
+
+function parseFeeEntries(payload) {
+  const rows = Array.isArray(payload) ? payload : payload?.data;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => ({
+      finalityThreshold: Number(row.finalityThreshold),
+      minimumFee: Number(row.minimumFee),
+    }))
+    .filter((row) => Number.isFinite(row.finalityThreshold) && Number.isFinite(row.minimumFee));
+}
+
+function findFeeEntry(entries, finalityThreshold) {
+  return entries?.find((entry) => entry.finalityThreshold === finalityThreshold) || null;
+}
+
+async function fetchRouteFees(src, dst, { fresh = false } = {}) {
+  const key = getRouteKey(src, dst);
+  if (!fresh && feeQuoteCache.has(key)) return feeQuoteCache.get(key);
+
+  const res = await fetch(`${ATTESTATION_API}/v2/burn/USDC/fees/${src.domain}/${dst.domain}`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Circle fee quote failed (${res.status}).`);
+
+  const entries = parseFeeEntries(await res.json());
+  if (!entries.length) throw new Error('Circle fee quote is unavailable for this route.');
+  feeQuoteCache.set(key, entries);
+  return entries;
+}
+
+async function fetchFastAllowance() {
+  const res = await fetch(`${ATTESTATION_API}/v2/fastBurn/USDC/allowance`, {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Circle fast allowance check failed (${res.status}).`);
+  const data = await res.json();
+  return decimalUsdcToSubunits(data.allowance);
+}
+
+async function refreshSpeedQuote({ fresh = false } = {}) {
+  const src = getSrcChain();
+  const dst = getDstChain();
+  const key = getRouteKey(src, dst);
+  const requestId = ++feeQuoteRequestId;
+
+  feeQuoteState.routeKey = key;
+  feeQuoteState.loading = true;
+  feeQuoteState.error = null;
+  if (fresh) feeQuoteState.entries = null;
+  renderSpeedUI();
+
+  try {
+    const entries = await fetchRouteFees(src, dst, { fresh });
+    if (requestId !== feeQuoteRequestId || key !== getRouteKey()) return;
+    feeQuoteState.routeKey = key;
+    feeQuoteState.loading = false;
+    feeQuoteState.error = null;
+    feeQuoteState.entries = entries;
+  } catch (err) {
+    if (requestId !== feeQuoteRequestId || key !== getRouteKey()) return;
+    feeQuoteState.routeKey = key;
+    feeQuoteState.loading = false;
+    feeQuoteState.error = err.shortMessage || err.message || String(err);
+    feeQuoteState.entries = null;
+  }
+  renderSpeedUI();
+}
+
+async function getTransferParams(amount, src, dst, mode = transferMode) {
+  if (mode !== 'fast') {
+    return {
+      maxFee: STANDARD_MAX_FEE,
+      finalityThreshold: STANDARD_FINALITY,
+      feeBps: 0,
+    };
+  }
+
+  const entries = await fetchRouteFees(src, dst, { fresh: true });
+  const fastFee = findFeeEntry(entries, FAST_FINALITY);
+  if (!fastFee) throw new Error('Fast CCTP is not available for this route.');
+
+  const allowance = await fetchFastAllowance();
+  if (allowance < amount) {
+    throw new Error(`Fast CCTP allowance is ${fmtUsdcSubunits(allowance)} USDC. Use Standard or retry later.`);
+  }
+
+  return {
+    maxFee: feeBpsToMaxFee(amount, fastFee.minimumFee),
+    finalityThreshold: FAST_FINALITY,
+    feeBps: fastFee.minimumFee,
+  };
 }
 
 function ensureWallet() {
@@ -369,6 +526,70 @@ function renderRecipientDisplay() {
   els.recipientAddr.textContent = recipient || '—';
 }
 
+function canChangeSpeed() {
+  return !bridgeInFlight && (run.phase === 'idle' || run.phase === 'success' || run.phase === 'failed');
+}
+
+function renderSpeedUI() {
+  const isFast = transferMode === 'fast';
+  const routeEntries = feeQuoteState.routeKey === getRouteKey() ? feeQuoteState.entries : null;
+  const fastFee = findFeeEntry(routeEntries, FAST_FINALITY);
+  const amount = readAmountInput();
+  const locked = !canChangeSpeed();
+
+  els.speedStandard.classList.toggle('active', !isFast);
+  els.speedFast.classList.toggle('active', isFast);
+  els.speedStandard.setAttribute('aria-pressed', String(!isFast));
+  els.speedFast.setAttribute('aria-pressed', String(isFast));
+  els.speedStandard.disabled = locked;
+  els.speedFast.disabled = locked;
+
+  let fastFeeText = 'QUOTE';
+  if (feeQuoteState.loading && !routeEntries) {
+    fastFeeText = '...';
+  } else if (feeQuoteState.error) {
+    fastFeeText = 'N/A';
+  } else if (fastFee) {
+    const maxFee = amount && amount > 0n
+      ? feeBpsToMaxFee(amount, fastFee.minimumFee)
+      : null;
+    fastFeeText = fastFee.minimumFee === 0
+      ? 'FREE'
+      : (maxFee ? `<=${fmtUsdcSubunits(maxFee, 4)}` : `${fmtBps(fastFee.minimumFee)} BPS`);
+  }
+  els.speedFastFee.textContent = fastFeeText;
+
+  let meta = 'STANDARD · FINALIZED · FREE';
+  let metaTone = '';
+  if (isFast) {
+    if (feeQuoteState.loading && !routeEntries) {
+      meta = 'FAST · FETCHING FEE';
+      metaTone = 'warn';
+    } else if (feeQuoteState.error) {
+      meta = 'FAST · FEE UNAVAILABLE';
+      metaTone = 'warn';
+    } else if (!fastFee) {
+      meta = 'FAST · ROUTE UNAVAILABLE';
+      metaTone = 'warn';
+    } else if (fastFee.minimumFee === 0) {
+      meta = 'FAST · CONFIRMED · FREE';
+      metaTone = 'good';
+    } else {
+      meta = `FAST · CONFIRMED · ${fmtBps(fastFee.minimumFee)} BPS`;
+      metaTone = 'warn';
+    }
+  }
+  els.speedMeta.className = `speed-meta${metaTone ? ' ' + metaTone : ''}`;
+  els.speedMeta.textContent = meta;
+}
+
+function setTransferMode(mode) {
+  if (!canChangeSpeed() || (mode !== 'standard' && mode !== 'fast')) return;
+  transferMode = mode;
+  renderSpeedUI();
+  if (mode === 'fast') refreshSpeedQuote();
+}
+
 function buildChainMenu() {
   els.chainMenu.innerHTML = '';
   for (const c of SOURCE_CHAINS) {
@@ -394,6 +615,7 @@ function selectChain(id) {
   renderRouteUI();
   buildChainMenu();
   refreshBalance();
+  refreshSpeedQuote();
   // The destination node and the bridge button label both depend on the
   // selected chain, so re-render the phase to pick up the new dst.name.
   renderPhase();
@@ -406,6 +628,7 @@ function swapDirection() {
   resetRun();
   renderRouteUI();
   refreshBalance();
+  refreshSpeedQuote();
 }
 
 async function refreshBalance() {
@@ -562,6 +785,7 @@ function renderDetailStrip(phase) {
   const srcName = src.name;
   const dstName = dst.name;
   const dstUpper = dstName.toUpperCase();
+  const modeLabel = (run.transferMode || transferMode).toUpperCase();
 
   let detail = null;
   if (phase === 'approve-sign') {
@@ -570,12 +794,12 @@ function renderDetailStrip(phase) {
     detail = { tone: 'cyan', strong: 'APPROVE USDC', text: `Confirming on ${srcName}…`,
                hash: run.approveHash, explorer: src.explorer };
   } else if (phase === 'burn-sign') {
-    detail = { tone: 'cyan', strong: 'BURN ON SOURCE', text: 'Awaiting wallet signature — depositForBurn' };
+    detail = { tone: 'cyan', strong: 'BURN ON SOURCE', text: `Awaiting wallet signature · ${modeLabel}` };
   } else if (phase === 'burn-confirm') {
     detail = { tone: 'cyan', strong: 'BURN ON SOURCE', text: `Confirming burn on ${srcName}`,
                hash: run.burnHash, explorer: src.explorer };
   } else if (phase === 'attest') {
-    detail = { tone: 'amber', strong: 'CIRCLE ATTESTATION', text: 'Polling iris-api.circle.com',
+    detail = { tone: 'amber', strong: 'CIRCLE ATTESTATION', text: `Polling iris-api.circle.com · ${modeLabel}`,
                elapsed: formatElapsed(run.elapsedMs) };
   } else if (phase === 'switch') {
     detail = { tone: 'cyan', strong: 'SWITCH NETWORK', text: `Switching wallet to ${dstName} (chain ${dst.id})` };
@@ -652,6 +876,7 @@ function renderPhase() {
     }
     els.bridgeBtn.disabled = p.btn.disabled;
   }
+  renderSpeedUI();
 
   // Statuses on each node
   renderNodeStatuses(phase);
@@ -677,6 +902,7 @@ function setPhase(phase) {
 function resetRun() {
   run.phase = 'idle';
   run.amount = '';
+  run.transferMode = transferMode;
   run.approveHash = null;
   run.burnHash = null;
   run.mintHash = null;
@@ -717,6 +943,7 @@ function disconnect() {
 // ─── Bridge flow ──────────────────────────────────────────────────────────────
 async function bridge() {
   if (!account) { alert('Connect a wallet first.'); return; }
+  if (bridgeInFlight) return;
 
   // Reset run state for a fresh bridge
   run.approveHash = null;
@@ -724,6 +951,7 @@ async function bridge() {
   run.mintHash = null;
   run.elapsedMs = 0;
   run.error = null;
+  run.transferMode = transferMode;
 
   const src = getSrcChain();
   const dst = getDstChain();
@@ -748,8 +976,11 @@ async function bridge() {
 
   const sourceClient = publicClient(src);
   const destClient = publicClient(dst);
+  bridgeInFlight = true;
+  renderSpeedUI();
 
   try {
+    const transferParams = await getTransferParams(amount, src, dst, run.transferMode);
     await ensureChain(src);
 
     // Allowance check — skip approve if sufficient
@@ -787,8 +1018,8 @@ async function bridge() {
         mintRecipient,
         src.usdc,
         ZERO_BYTES32,
-        STANDARD_MAX_FEE,
-        STANDARD_FINALITY,
+        transferParams.maxFee,
+        transferParams.finalityThreshold,
       ],
       chain: viemChain(src),
     });
@@ -835,6 +1066,9 @@ async function bridge() {
     console.error('bridge failed', err);
     run.error = err.shortMessage || err.details || err.message || String(err);
     setPhase('failed');
+  } finally {
+    bridgeInFlight = false;
+    renderSpeedUI();
   }
 }
 
@@ -891,8 +1125,14 @@ document.addEventListener('click', (e) => {
 els.maxBtn.addEventListener('click', () => {
   if (els.balanceNum.dataset.raw) {
     els.amount.value = formatUnits(BigInt(els.balanceNum.dataset.raw), 6);
+    renderSpeedUI();
   }
 });
+els.amount.addEventListener('input', renderSpeedUI);
+
+// CCTP speed toggle
+els.speedStandard.addEventListener('click', () => setTransferMode('standard'));
+els.speedFast.addEventListener('click', () => setTransferMode('fast'));
 
 // Recipient edit
 function openRecipientEditor() {
@@ -952,3 +1192,4 @@ renderRouteUI();
 renderRecipientDisplay();
 renderConnectChip();
 renderPhase();
+refreshSpeedQuote();
