@@ -4,57 +4,167 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>USDC → Injective</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <style>
+    html, body { margin: 0; padding: 0; min-height: 100vh; background: #06080d; }
+  </style>
 </head>
 <body>
-  <div class="noise"></div>
-
-  <main class="card">
-    <header class="card-header">
-      <h1>USDC <span class="arrow">→</span> Injective</h1>
-      <button id="connect-btn" class="btn btn-secondary">Connect</button>
-    </header>
-
-    <section class="form">
-      <label class="field">
-        <span class="label">From</span>
-        <select id="source-select" class="input"></select>
-      </label>
-
-      <label class="field">
-        <span class="label">
-          Amount
-          <span class="balance-hint" id="balance"></span>
-        </span>
-        <div class="input-group">
-          <input id="amount" class="input" type="number" inputmode="decimal" min="0" step="0.000001" placeholder="0.00">
-          <button id="max-btn" class="btn btn-ghost" type="button">Max</button>
-          <span class="suffix">USDC</span>
+  <div class="widget hud" id="widget">
+    <div class="card">
+      <header class="card-header">
+        <div class="brand">
+          <div class="brand-mark">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 6 L6 2 L10 6 L6 10 Z" fill="white"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <div class="brand-name">USDC → INJECTIVE</div>
+            <div class="brand-sub">CCTP V2 · DOMAIN 29</div>
+          </div>
         </div>
-      </label>
+        <button class="connect-btn" id="connect-btn" type="button">
+          <span class="pulse-dot idle" id="connect-dot"></span>
+          <span class="addr" id="connect-addr">Connect</span>
+        </button>
+      </header>
 
-      <label class="field">
-        <span class="label">Recipient on Injective EVM</span>
-        <input id="recipient" class="input" type="text" placeholder="0x...">
-      </label>
+      <div class="split">
+        <section class="form">
+          <div class="field">
+            <label class="field-label">§ FROM</label>
+            <div class="chain-select" id="chain-select" style="position: relative;">
+              <div class="chain-mark eth" id="src-mark-inline">Ξ</div>
+              <span class="chain-name" id="src-name-inline">Ethereum</span>
+              <span class="caret">▾</span>
+              <div class="chain-menu" id="chain-menu" hidden></div>
+            </div>
+          </div>
 
-      <button id="bridge-btn" class="btn btn-primary" disabled>Bridge to Injective</button>
-    </section>
+          <div class="field">
+            <label class="field-label">§ AMOUNT</label>
+            <div class="amount-row hero">
+              <div class="amount-input-row">
+                <input class="amount-input" id="amount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                <span class="amount-suffix">USDC</span>
+              </div>
+              <div class="amount-meta">
+                <span class="balance">BAL <span class="num" id="balance-num">—</span></span>
+                <button class="max-btn" id="max-btn" type="button">MAX</button>
+              </div>
+            </div>
+          </div>
 
-    <section class="timeline" id="timeline" hidden>
-      <ol id="steps"></ol>
-    </section>
+          <div class="field">
+            <label class="field-label">§ RECIPIENT · INJ EVM</label>
+            <div class="recipient" id="recipient-row">
+              <div class="recipient-avatar" aria-hidden="true"></div>
+              <span class="recipient-addr" id="recipient-addr">—</span>
+              <input class="recipient-input" id="recipient-input" type="text" autocomplete="off" hidden>
+              <span class="recipient-edit" id="recipient-edit" role="button" tabindex="0">EDIT</span>
+            </div>
+          </div>
 
-    <footer class="card-footer">
-      <small>
-        Direct CCTP V2 burn-and-mint. No relayer, no aggregator.
-        Domain <code>29</code> · USDC <code>0xa00C…35a</code>.
-      </small>
-    </footer>
-  </main>
+          <button class="btn-primary" id="bridge-btn" type="button" disabled>BRIDGE TO INJECTIVE</button>
+        </section>
+
+        <section class="stage" id="stage">
+          <span class="hud-corner tl" aria-hidden="true"></span>
+          <span class="hud-corner tr" aria-hidden="true"></span>
+          <span class="hud-corner bl" aria-hidden="true"></span>
+          <span class="hud-corner br" aria-hidden="true"></span>
+
+          <header class="stage-header">
+            <span>§ TRANSFER STAGE</span>
+            <span class="live-pill idle" id="live-pill" aria-live="polite">
+              <span class="blip" aria-hidden="true"></span><span id="live-pill-text">IDLE</span>
+            </span>
+          </header>
+
+          <div class="stage-track">
+            <div class="node dim idle-pulse" id="node-source">
+              <div class="node-avatar">
+                <div class="ring" aria-hidden="true"></div>
+                <div class="chain-mark lg eth" id="src-mark">Ξ</div>
+                <div class="pip" id="src-pip" hidden></div>
+              </div>
+              <div class="node-info">
+                <div class="node-label">SOURCE</div>
+                <div class="node-name" id="src-name">Ethereum</div>
+              </div>
+              <div class="node-status" id="src-status">
+                <span class="status-line"><span class="tag-dim">READY</span></span>
+              </div>
+            </div>
+
+            <div class="segment empty" id="seg1">
+              <div class="fill" style="height: 0%;"></div>
+              <div class="disc" id="disc1" hidden>$</div>
+            </div>
+
+            <div class="node dim" id="node-circle">
+              <div class="node-avatar">
+                <div class="ring" aria-hidden="true"></div>
+                <div class="chain-mark lg circle">○</div>
+                <div class="pip" id="circle-pip" hidden></div>
+              </div>
+              <div class="node-info">
+                <div class="node-label">VALIDATOR</div>
+                <div class="node-name">Circle</div>
+              </div>
+              <div class="node-status" id="circle-status">
+                <span class="status-line"><span class="tag-dim">CCTP V2</span></span>
+              </div>
+            </div>
+
+            <div class="segment empty" id="seg2">
+              <div class="fill" style="height: 0%;"></div>
+              <div class="disc" id="disc2" hidden>$</div>
+            </div>
+
+            <div class="node dim" id="node-inj">
+              <div class="node-avatar">
+                <div class="ring" aria-hidden="true"></div>
+                <div class="chain-mark lg inj">INJ</div>
+                <div class="pip" id="inj-pip" hidden></div>
+              </div>
+              <div class="node-info">
+                <div class="node-label">DESTINATION</div>
+                <div class="node-name">Injective EVM</div>
+              </div>
+              <div class="node-status" id="inj-status">
+                <span class="status-line"><span class="tag-dim">DOMAIN 29</span></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-strip" id="detail-strip" role="status" hidden>
+            <div class="icon" aria-hidden="true"></div>
+            <span class="strong" id="detail-strong"></span>
+            <span class="sep" style="color: var(--text-mute);">·</span>
+            <span id="detail-text"></span>
+            <a class="hash" id="detail-hash" href="#" target="_blank" rel="noopener" hidden></a>
+            <span class="elapsed" id="detail-elapsed" hidden></span>
+          </div>
+
+          <div class="success-overlay" id="success-overlay" hidden aria-hidden="true">
+            <div class="ring1"></div>
+            <div class="ring2"></div>
+            <div class="amount-restated" id="amount-restated"></div>
+          </div>
+        </section>
+      </div>
+
+      <footer class="card-footer">
+        <span>USDC <span style="color: var(--text-dim);">0xa00C…35a</span></span>
+        <span>
+          <span class="dot"></span>DOMAIN 29<span class="dot"></span>
+          <a href="https://github.com/ckhbtc/usdc-widget" target="_blank" rel="noopener">VIEW ON GITHUB ↗</a>
+        </span>
+      </footer>
+    </div>
+  </div>
 
   <script type="module" src="/app.js"></script>
 </body>
