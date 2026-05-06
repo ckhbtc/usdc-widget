@@ -2,6 +2,13 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* The [hidden] attribute is the single source of truth for "do not show" in
+   this widget. Class rules below set display: flex/grid for live elements;
+   without this override they out-specify the user-agent [hidden] reset and
+   the chain menu, disc, pip, detail strip, and success overlay all stay
+   visible regardless of the JS toggle. Forcing it makes hidden actually hide. */
+[hidden] { display: none !important; }
+
 :root {
   --bg: #06080d;
   --surface: #0d1118;
