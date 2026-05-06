@@ -3,6 +3,7 @@ import {
   createWalletClient,
   custom,
   http,
+  fallback,
   parseUnits,
   formatUnits,
   pad,
@@ -82,16 +83,20 @@ async function connect() {
   refreshBalance();
 }
 
+function publicClient(c) {
+  return createPublicClient({
+    chain: viemChain(c),
+    transport: fallback(c.rpcs.map((url) => http(url, { timeout: 8000 }))),
+  });
+}
+
 async function refreshBalance() {
   if (!account) return;
   const src = getSource();
   elBalance.textContent = 'loading balance…';
+  elBalance.removeAttribute('title');
   try {
-    const client = createPublicClient({
-      chain: viemChain(src),
-      transport: http(src.rpc),
-    });
-    const bal = await client.readContract({
+    const bal = await publicClient(src).readContract({
       address: src.usdc,
       abi: ERC20_ABI,
       functionName: 'balanceOf',
@@ -99,8 +104,10 @@ async function refreshBalance() {
     });
     elBalance.textContent = `${formatUnits(bal, 6)} USDC available`;
     elBalance.dataset.raw = bal.toString();
-  } catch {
-    elBalance.textContent = 'balance unavailable';
+  } catch (err) {
+    console.error('balance fetch failed for', src.name, err);
+    elBalance.textContent = 'balance unavailable (hover for error)';
+    elBalance.title = err.shortMessage || err.message || String(err);
     delete elBalance.dataset.raw;
   }
 }
@@ -120,7 +127,7 @@ async function ensureChain(chain) {
           chainId: hexId,
           chainName: chain.name,
           nativeCurrency: chain.nativeCurrency,
-          rpcUrls: [chain.rpc],
+          rpcUrls: chain.rpcs,
           blockExplorerUrls: [chain.explorer],
         }],
       });
@@ -188,14 +195,8 @@ async function bridge() {
     const recipient = getAddress(recipientRaw);
     const mintRecipient = pad(recipient, { size: 32 });
 
-    const sourceClient = createPublicClient({
-      chain: viemChain(src),
-      transport: http(src.rpc),
-    });
-    const injClient = createPublicClient({
-      chain: viemChain(INJECTIVE),
-      transport: http(INJECTIVE.rpc),
-    });
+    const sourceClient = publicClient(src);
+    const injClient = publicClient(INJECTIVE);
 
     await ensureChain(src);
 

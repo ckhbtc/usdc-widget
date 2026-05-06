@@ -14,12 +14,16 @@ export const STANDARD_MAX_FEE = 0n;
 export const ZERO_BYTES32 =
   '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-// Destination: Injective EVM (chain id 1776, CCTP domain 29).
+// Each chain lists multiple RPCs. publicnode.com endpoints are listed first
+// because they have permissive CORS and rarely rate-limit single eth_call
+// requests; the original endpoints stay as fallbacks.
 export const INJECTIVE = {
   id: 1776,
   domain: 29,
   name: 'Injective',
-  rpc: 'https://sentry.evm-rpc.injective.network',
+  rpcs: [
+    'https://sentry.evm-rpc.injective.network',
+  ],
   explorer: 'https://blockscout.injective.network',
   nativeCurrency: { name: 'INJ', symbol: 'INJ', decimals: 18 },
   // USDC ERC-20 on Injective EVM (Cosmos bank denom: erc20:0xa00C59fF...)
@@ -27,14 +31,17 @@ export const INJECTIVE = {
   cctp: CCTP_V2,
 };
 
-// Source chains the widget can bridge FROM. All values are mainnet, native
-// (Circle-issued) USDC contracts.
 export const SOURCE_CHAINS = [
   {
     id: 1,
     domain: 0,
     name: 'Ethereum',
-    rpc: 'https://eth.llamarpc.com',
+    rpcs: [
+      'https://ethereum-rpc.publicnode.com',
+      'https://eth.llamarpc.com',
+      'https://eth.drpc.org',
+      'https://rpc.ankr.com/eth',
+    ],
     explorer: 'https://etherscan.io',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
@@ -45,7 +52,11 @@ export const SOURCE_CHAINS = [
     id: 42161,
     domain: 3,
     name: 'Arbitrum One',
-    rpc: 'https://arb1.arbitrum.io/rpc',
+    rpcs: [
+      'https://arbitrum-one-rpc.publicnode.com',
+      'https://arb1.arbitrum.io/rpc',
+      'https://arbitrum.drpc.org',
+    ],
     explorer: 'https://arbiscan.io',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
@@ -56,7 +67,11 @@ export const SOURCE_CHAINS = [
     id: 8453,
     domain: 6,
     name: 'Base',
-    rpc: 'https://mainnet.base.org',
+    rpcs: [
+      'https://base-rpc.publicnode.com',
+      'https://mainnet.base.org',
+      'https://base.drpc.org',
+    ],
     explorer: 'https://basescan.org',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
@@ -67,7 +82,11 @@ export const SOURCE_CHAINS = [
     id: 10,
     domain: 2,
     name: 'OP Mainnet',
-    rpc: 'https://mainnet.optimism.io',
+    rpcs: [
+      'https://optimism-rpc.publicnode.com',
+      'https://mainnet.optimism.io',
+      'https://optimism.drpc.org',
+    ],
     explorer: 'https://optimistic.etherscan.io',
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     usdc: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
@@ -78,7 +97,11 @@ export const SOURCE_CHAINS = [
     id: 137,
     domain: 7,
     name: 'Polygon',
-    rpc: 'https://polygon-rpc.com',
+    rpcs: [
+      'https://polygon-bor-rpc.publicnode.com',
+      'https://polygon-rpc.com',
+      'https://polygon.drpc.org',
+    ],
     explorer: 'https://polygonscan.com',
     nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
     usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
@@ -89,7 +112,11 @@ export const SOURCE_CHAINS = [
     id: 43114,
     domain: 1,
     name: 'Avalanche',
-    rpc: 'https://api.avax.network/ext/bc/C/rpc',
+    rpcs: [
+      'https://avalanche-c-chain-rpc.publicnode.com',
+      'https://api.avax.network/ext/bc/C/rpc',
+      'https://avalanche.drpc.org',
+    ],
     explorer: 'https://snowtrace.io',
     nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
     usdc: '0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E',
@@ -106,8 +133,8 @@ export function viemChain(c) {
     name: c.name,
     nativeCurrency: c.nativeCurrency,
     rpcUrls: {
-      default: { http: [c.rpc] },
-      public: { http: [c.rpc] },
+      default: { http: c.rpcs },
+      public: { http: c.rpcs },
     },
     blockExplorers: {
       default: { name: 'Explorer', url: c.explorer },
