@@ -271,6 +271,20 @@
 .chain-mark.circle { background: linear-gradient(135deg, #2775ca, #134d8a); }
 .chain-mark.inj  { background: linear-gradient(135deg, #0082fa, #0046a0); box-shadow: 0 0 14px rgba(0, 130, 250, 0.45); }
 
+/* Icon-mode: replace the gradient with a logo image. The image fills the
+   circle via object-fit: cover; overflow: hidden masks any non-square art
+   to the round shape. Gradient is suppressed so transparent PNGs don't peek. */
+.chain-mark.has-icon { background: transparent; overflow: hidden; }
+.chain-mark.has-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+/* Keep the inj glow halo even in icon mode — it's a brand cue, not bg color. */
+.chain-mark.inj.has-icon { box-shadow: 0 0 14px rgba(0, 130, 250, 0.45); }
+
 /* Amount field — hero treatment */
 .amount-row {
   position: relative;

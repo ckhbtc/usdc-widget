@@ -31,13 +31,38 @@ import {
 // Per-chain visual info for the redesigned UI. Keyed by chain id; mirrors the
 // chain-mark CSS classes in styles.css. `chains.js` stays untouched (locked).
 const CHAIN_DISPLAY = {
-  1:     { mark: 'eth',  letter: 'Ξ' },
-  42161: { mark: 'arb',  letter: 'A' },
-  8453:  { mark: 'base', letter: 'B' },
-  10:    { mark: 'op',   letter: 'OP' },
-  137:   { mark: 'poly', letter: 'P' },
-  43114: { mark: 'avax', letter: 'A' },
+  1:     { mark: 'eth',  letter: 'Ξ',  icon: '/eth.png' },
+  42161: { mark: 'arb',  letter: 'A',  icon: '/arb.png' },
+  8453:  { mark: 'base', letter: 'B',  icon: '/base.png' },
+  10:    { mark: 'op',   letter: 'OP', icon: '/op.png' },
+  137:   { mark: 'poly', letter: 'P' },   // monogram fallback — no icon yet
+  43114: { mark: 'avax', letter: 'A' },   // monogram fallback — no icon yet
 };
+
+// Paint a chain-mark element in place. If the chain has an icon, render an
+// <img>; otherwise render the monogram letter with the gradient background.
+function paintChainMark(el, displayKey, size = '') {
+  const d = CHAIN_DISPLAY[displayKey] || {};
+  const sizeCls = size ? ` ${size}` : '';
+  if (d.icon) {
+    el.className = `chain-mark${sizeCls} ${d.mark} has-icon`;
+    el.innerHTML = `<img src="${d.icon}" alt="" loading="lazy">`;
+  } else {
+    el.className = `chain-mark${sizeCls} ${d.mark}`;
+    el.textContent = d.letter || '?';
+  }
+}
+
+// Same thing but as an HTML string, for places that build markup from scratch
+// (the chain dropdown menu items).
+function chainMarkHtml(displayKey, size = '') {
+  const d = CHAIN_DISPLAY[displayKey] || {};
+  const sizeCls = size ? ` ${size}` : '';
+  if (d.icon) {
+    return `<div class="chain-mark${sizeCls} ${d.mark} has-icon"><img src="${d.icon}" alt="" loading="lazy"></div>`;
+  }
+  return `<div class="chain-mark${sizeCls} ${d.mark}">${escapeHtml(d.letter || '?')}</div>`;
+}
 
 // ─── Phase render table ───────────────────────────────────────────────────────
 // Per the design handoff (§3.2). Maps a derived phase to all visual classes /
@@ -287,14 +312,11 @@ function renderConnectChip() {
 
 function renderSourceUI() {
   const c = getSource();
-  const d = CHAIN_DISPLAY[c.id] || { mark: 'eth', letter: '?' };
-  // Inline pill in the form
-  els.srcMarkInline.className = `chain-mark ${d.mark}`;
-  els.srcMarkInline.textContent = d.letter;
+  // Inline pill in the form (base size)
+  paintChainMark(els.srcMarkInline, c.id);
   els.srcNameInline.textContent = c.name;
-  // Stage source node monogram + name
-  els.srcMark.className = `chain-mark xl ${d.mark}`;
-  els.srcMark.textContent = d.letter;
+  // Stage source node (xl size)
+  paintChainMark(els.srcMark, c.id, 'xl');
   els.srcName.textContent = c.name;
 }
 
@@ -305,15 +327,11 @@ function renderRecipientDisplay() {
 function buildChainMenu() {
   els.chainMenu.innerHTML = '';
   for (const c of SOURCE_CHAINS) {
-    const d = CHAIN_DISPLAY[c.id];
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.dataset.chainId = c.id;
     if (c.id === selectedChainId) btn.classList.add('sel');
-    btn.innerHTML = `
-      <div class="chain-mark ${d.mark}">${escapeHtml(d.letter)}</div>
-      <span>${escapeHtml(c.name)}</span>
-    `;
+    btn.innerHTML = `${chainMarkHtml(c.id)}<span>${escapeHtml(c.name)}</span>`;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       selectChain(c.id);
