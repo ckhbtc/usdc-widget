@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Deprecated USDC widget that redirects users to the official Injective Bridge.",
+  "description": "Deprecated USDC widget that redirects users to redirect.inj.so.",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",

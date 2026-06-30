@@ -1,11 +1,11 @@
 # usdc-widget
 
-Deprecated. The standalone USDC widget now redirects users to the official
-Injective Bridge at [https://bridge.injective.network/](https://bridge.injective.network/).
+Deprecated. The standalone USDC widget now redirects users to
+[https://redirect.inj.so/](https://redirect.inj.so/).
 
 The implementation is kept only as a fallback for hosts that still serve this
 repo directly. Production should use an nginx 301 redirect from `usdc.inj.so`
-to `bridge.injective.network`.
+to `redirect.inj.so`.
 
 ## Legacy notes
 
