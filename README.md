@@ -1,5 +1,14 @@
 # usdc-widget
 
+Deprecated. The standalone USDC widget now redirects users to the official
+Injective Bridge at [https://bridge.injective.network/](https://bridge.injective.network/).
+
+The implementation is kept only as a fallback for hosts that still serve this
+repo directly. Production should use an nginx 301 redirect from `usdc.inj.so`
+to `bridge.injective.network`.
+
+## Legacy notes
+
 A tiny, self-hosted UI for bridging native USDC **into Injective EVM** via
 Circle CCTP V2. Direct burn-and-mint — no relayer, no aggregator, no
 custodian. Walks the user through:

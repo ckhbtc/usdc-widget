@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Tiny self-hosted CCTP widget for bridging native USDC into Injective EVM (domain 29).",
+  "description": "Deprecated USDC widget that redirects users to the official Injective Bridge.",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

@@ -3,207 +3,107 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>USDC → Injective</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="refresh" content="0; url=https://bridge.injective.network/">
+  <link rel="canonical" href="https://bridge.injective.network/">
+  <title>USDC Bridge Deprecated</title>
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="stylesheet" href="/styles.css">
   <style>
-    html, body { margin: 0; padding: 0; min-height: 100vh; background: #06080d; }
+    :root {
+      color-scheme: dark;
+      --bg: #05070b;
+      --panel: #0b111c;
+      --line: rgba(105, 214, 255, 0.28);
+      --text: #eef7ff;
+      --muted: #9fb2c7;
+      --cyan: #22d3ee;
+      --blue: #4f8cff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(34, 211, 238, 0.18), transparent 34rem),
+        linear-gradient(180deg, #08111f 0%, var(--bg) 58%);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(100%, 520px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: clamp(28px, 8vw, 48px);
+      background: linear-gradient(180deg, rgba(12, 19, 31, 0.96), rgba(7, 11, 18, 0.96));
+      box-shadow: 0 24px 90px rgba(0, 0, 0, 0.45);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--cyan);
+      font: 700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 7vw, 52px);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      margin-top: 28px;
+      padding: 0 18px;
+      border: 1px solid rgba(34, 211, 238, 0.64);
+      border-radius: 6px;
+      color: #001018;
+      background: linear-gradient(135deg, var(--cyan), var(--blue));
+      font-weight: 800;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+
+    a:focus-visible {
+      outline: 3px solid rgba(34, 211, 238, 0.45);
+      outline-offset: 3px;
+    }
   </style>
 </head>
 <body>
-  <div class="widget hud" id="widget">
-    <div class="card">
-      <header class="card-header">
-        <div class="brand">
-          <div class="brand-mark">
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M2 6 L6 2 L10 6 L6 10 Z" fill="white"/>
-            </svg>
-          </div>
-          <div class="brand-text">
-            <div class="brand-name">
-              <span id="dir-from">USDC</span>
-              <span class="dir-arrow" aria-hidden="true">→</span>
-              <span id="dir-to">INJECTIVE</span>
-            </div>
-            <div class="brand-sub">CCTP V2 · DOMAIN 29</div>
-          </div>
-        </div>
-        <button class="connect-btn" id="connect-btn" type="button">
-          <span class="pulse-dot idle" id="connect-dot"></span>
-          <span class="addr" id="connect-addr">Connect</span>
-        </button>
-      </header>
-
-      <nav class="direction-tabs" aria-label="Transfer direction">
-        <button class="direction-tab active" id="tab-in" type="button" aria-pressed="true">
-          <span class="direction-tab-icon" aria-hidden="true">↓</span>
-          <span>DEPOSIT</span>
-          <span class="direction-tab-sub">to Injective</span>
-        </button>
-        <button class="direction-tab" id="tab-out" type="button" aria-pressed="false">
-          <span class="direction-tab-icon" aria-hidden="true">↑</span>
-          <span>WITHDRAW</span>
-          <span class="direction-tab-sub">from Injective</span>
-        </button>
-      </nav>
-
-      <div class="split">
-        <section class="form">
-          <div class="field">
-            <label class="field-label" id="from-label">§ FROM</label>
-            <div class="chain-select" id="chain-select" style="position: relative;">
-              <div class="chain-mark eth" id="src-mark-inline">Ξ</div>
-              <span class="chain-name" id="src-name-inline">Ethereum</span>
-              <span class="caret">▾</span>
-              <div class="chain-menu" id="chain-menu" hidden></div>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field-label">§ AMOUNT</label>
-            <div class="amount-row hero">
-              <div class="amount-input-row">
-                <input class="amount-input" id="amount" type="text" inputmode="decimal" placeholder="0.00" autocomplete="off">
-                <span class="amount-suffix">USDC</span>
-              </div>
-              <div class="amount-meta">
-                <span class="balance">BAL <span class="num" id="balance-num">—</span></span>
-                <button class="max-btn" id="max-btn" type="button">MAX</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field-label">§ SPEED</label>
-            <div class="speed-panel">
-              <div class="speed-toggle" role="group" aria-label="CCTP transfer speed">
-                <button class="speed-option active" id="speed-standard" type="button" aria-pressed="true">
-                  <span>STANDARD</span>
-                  <small>FREE</small>
-                </button>
-                <button class="speed-option" id="speed-fast" type="button" aria-pressed="false">
-                  <span>FAST</span>
-                  <small id="speed-fast-fee">QUOTE</small>
-                </button>
-              </div>
-              <div class="speed-meta" id="speed-meta">STANDARD · FINALIZED</div>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field-label" id="recipient-label">§ RECIPIENT · INJ EVM</label>
-            <div class="recipient" id="recipient-row">
-              <div class="recipient-avatar" aria-hidden="true"></div>
-              <span class="recipient-addr" id="recipient-addr">—</span>
-              <input class="recipient-input" id="recipient-input" type="text" autocomplete="off" hidden>
-              <span class="recipient-edit" id="recipient-edit" role="button" tabindex="0">EDIT</span>
-            </div>
-          </div>
-
-          <button class="btn-primary" id="bridge-btn" type="button" disabled>BRIDGE TO INJECTIVE</button>
-        </section>
-
-        <section class="stage" id="stage">
-          <span class="hud-corner tl" aria-hidden="true"></span>
-          <span class="hud-corner tr" aria-hidden="true"></span>
-          <span class="hud-corner bl" aria-hidden="true"></span>
-          <span class="hud-corner br" aria-hidden="true"></span>
-
-          <header class="stage-header">
-            <span>§ TRANSFER STAGE</span>
-            <span class="live-pill idle" id="live-pill" aria-live="polite">
-              <span class="blip" aria-hidden="true"></span><span id="live-pill-text">IDLE</span>
-            </span>
-          </header>
-
-          <div class="stage-track">
-            <div class="node dim idle-pulse" id="node-source">
-              <div class="node-avatar">
-                <div class="ring" aria-hidden="true"></div>
-                <div class="chain-mark xl eth" id="src-mark">Ξ</div>
-                <div class="pip" id="src-pip" hidden></div>
-              </div>
-              <div class="node-info">
-                <div class="node-label">SOURCE</div>
-                <div class="node-name" id="src-name">Ethereum</div>
-              </div>
-              <div class="node-status" id="src-status">
-                <span class="status-line"><span class="tag-dim">READY</span></span>
-              </div>
-            </div>
-
-            <div class="segment empty" id="seg1">
-              <div class="fill" style="height: 0%;"></div>
-              <div class="disc" id="disc1" hidden>$</div>
-            </div>
-
-            <div class="node dim" id="node-circle">
-              <div class="node-avatar">
-                <div class="ring" aria-hidden="true"></div>
-                <div class="chain-mark xl circle has-icon"><img src="/usdc.png" alt="" loading="lazy"></div>
-                <div class="pip" id="circle-pip" hidden></div>
-              </div>
-              <div class="node-info">
-                <div class="node-label">VALIDATOR</div>
-                <div class="node-name">Circle</div>
-              </div>
-              <div class="node-status" id="circle-status">
-                <span class="status-line"><span class="tag-dim">CCTP V2</span></span>
-              </div>
-            </div>
-
-            <div class="segment empty" id="seg2">
-              <div class="fill" style="height: 0%;"></div>
-              <div class="disc" id="disc2" hidden>$</div>
-            </div>
-
-            <div class="node dim" id="node-dst">
-              <div class="node-avatar">
-                <div class="ring" aria-hidden="true"></div>
-                <div class="chain-mark xl inj has-icon" id="dst-mark"><img src="/inj.png" alt="" loading="lazy"></div>
-                <div class="pip" id="dst-pip" hidden></div>
-              </div>
-              <div class="node-info">
-                <div class="node-label">DESTINATION</div>
-                <div class="node-name" id="dst-name">Injective EVM</div>
-              </div>
-              <div class="node-status" id="dst-status">
-                <span class="status-line"><span class="tag-dim">DOMAIN 29</span></span>
-              </div>
-            </div>
-          </div>
-
-          <div class="detail-strip" id="detail-strip" role="status" hidden>
-            <div class="icon" aria-hidden="true"></div>
-            <span class="strong" id="detail-strong"></span>
-            <span class="sep" style="color: var(--text-mute);">·</span>
-            <span id="detail-text"></span>
-            <a class="hash" id="detail-hash" href="#" target="_blank" rel="noopener" hidden></a>
-            <span class="elapsed" id="detail-elapsed" hidden></span>
-          </div>
-
-          <div class="success-overlay" id="success-overlay" hidden aria-hidden="true">
-            <div class="ring1"></div>
-            <div class="ring2"></div>
-            <div class="amount-restated" id="amount-restated"></div>
-          </div>
-        </section>
-      </div>
-
-      <footer class="card-footer">
-        <span>USDC <span style="color: var(--text-dim);">0xa00C…35a</span></span>
-        <span>
-          <span class="dot"></span>DOMAIN 29<span class="dot"></span>
-          <a href="https://github.com/ckhbtc/usdc-widget" target="_blank" rel="noopener">VIEW ON GITHUB ↗</a>
-        </span>
-      </footer>
-    </div>
-  </div>
-
-  <script type="module" src="/app.js"></script>
+  <main>
+    <p class="eyebrow">Deprecated tool</p>
+    <h1>Use Injective Bridge</h1>
+    <p>
+      The standalone USDC widget has been retired. You are being redirected to the official Injective Bridge.
+    </p>
+    <a href="https://bridge.injective.network/">Open Injective Bridge</a>
+  </main>
+  <script>
+    window.location.replace('https://bridge.injective.network/');
+  </script>
 </body>
 </html>
